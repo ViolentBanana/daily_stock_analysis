@@ -11,9 +11,11 @@ import re
 import logging
 from typing import List, Optional
 
+import config
 from bot.commands.base import BotCommand
 from bot.models import BotMessage, BotResponse
 from data_provider.base import canonical_stock_code
+from src.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,7 @@ class AnalyzeCommand(BotCommand):
         
         # 检查是否需要完整报告（默认精简，传 full/完整/详细 切换）
         report_type = "simple"
+        report_type = config.get_config().report_type
         if len(args) > 1 and args[1].lower() in ["full", "完整", "详细"]:
             report_type = "full"
         logger.info(f"[AnalyzeCommand] 分析股票: {code}, 报告类型: {report_type}")
