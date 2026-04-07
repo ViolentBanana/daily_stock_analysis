@@ -347,11 +347,12 @@ def _handle_sync_analysis(
         )
 
         if result is None:
+            error_message = service.last_error or f"分析股票 {stock_code} 失败"
             raise HTTPException(
                 status_code=500,
                 detail={
                     "error": "analysis_failed",
-                    "message": f"分析股票 {stock_code} 失败"
+                    "message": error_message,
                 }
             )
 
@@ -477,8 +478,19 @@ def get_task_list(
 async def task_stream():
     """
     SSE 任务状态流
+    
+    事件类型：
+    - connected: 连接成功
+    - task_created: 新任务创建
+    - task_started: 任务开始执行
+    - task_progress: 任务阶段进度更新
+    - task_completed: 任务完成
+    - task_failed: 任务失败
+    - heartbeat: 心跳（每 30 秒）
+    
+    Returns:
+        StreamingResponse: SSE 事件流
     """
-
     async def event_generator():
         task_queue = get_task_queue()
         event_queue: asyncio.Queue = asyncio.Queue()
@@ -501,12 +513,13 @@ async def task_stream():
                     event = await asyncio.wait_for(event_queue.get(), timeout=30)
                     yield _format_sse_event(event["type"], event["data"])
                 except asyncio.TimeoutError:
-                    # 心跳保持连接，防止 ddnsto 认为连接超时而关掉它
+                    # 心跳
                     yield _format_sse_event("heartbeat", {
                         "timestamp": datetime.now().isoformat()
                     })
         except asyncio.CancelledError:
-            pass
+            logger.debug("SSE client disconnected, cancelling event generator")
+            raise
         finally:
             task_queue.unsubscribe(event_queue)
 
